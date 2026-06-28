@@ -1,0 +1,267 @@
+{
+  "seed": 20260715,
+  "protocol_note": "Causes and decoys were fixed before any model run. Scoring checks localization of the structured signature, not string similarity. Decoys must not be over-attributed.",
+  "dimensions": {
+    "species": [
+      "equine",
+      "cattle",
+      "canine",
+      "feline",
+      "swine",
+      "poultry"
+    ],
+    "modality": [
+      "Rx",
+      "OTC"
+    ],
+    "channels": [
+      "ecom_national",
+      "retail",
+      "vet_clinic"
+    ],
+    "regions": [
+      "NE",
+      "MA",
+      "SE",
+      "MW",
+      "TX",
+      "MTN",
+      "PSW",
+      "PNW"
+    ],
+    "months": [
+      "2024-01",
+      "2024-02",
+      "2024-03",
+      "2024-04",
+      "2024-05",
+      "2024-06",
+      "2024-07",
+      "2024-08",
+      "2024-09",
+      "2024-10",
+      "2024-11",
+      "2024-12",
+      "2025-01",
+      "2025-02",
+      "2025-03",
+      "2025-04",
+      "2025-05",
+      "2025-06",
+      "2025-07",
+      "2025-08",
+      "2025-09",
+      "2025-10",
+      "2025-11",
+      "2025-12"
+    ]
+  },
+  "causes": [
+    {
+      "id": "C1_price_increase_equine_otc_TX",
+      "is_decoy": false,
+      "mechanism": "price_increase",
+      "scope": {
+        "species": "equine",
+        "modality": "OTC",
+        "region": "TX"
+      },
+      "window": [
+        "2025-01",
+        "2025-02",
+        "2025-03"
+      ],
+      "direction": "down",
+      "metric": "units",
+      "magnitude_pct": -28,
+      "driver_detail": {
+        "price_change_pct": 18
+      },
+      "layer_visible": "transform",
+      "detectable_by": [
+        "price_vs_volume_decomposition",
+        "region_breakdown"
+      ],
+      "narrative": "A list-price increase of ~18% on equine OTC SKUs in TX starting 2025Q1 suppressed unit volume ~28%; revenue held roughly flat, so the drop is volume-driven, visible only when price and volume are separated."
+    },
+    {
+      "id": "C2_crosswalk_gap_ecom_canine_fleatick",
+      "is_decoy": false,
+      "mechanism": "lineage_crosswalk_gap",
+      "scope": {
+        "species": "canine",
+        "family": "flea_tick",
+        "channel": "ecom_national"
+      },
+      "window": [
+        "2025-04",
+        "2025-05"
+      ],
+      "direction": "down",
+      "metric": "units",
+      "magnitude_pct": -100,
+      "driver_detail": {
+        "note": "new ecom product ids not added to crosswalk; sales fell out of transform mapping"
+      },
+      "layer_visible": "stage_vs_transform",
+      "detectable_by": [
+        "lineage_drilldown",
+        "channel_breakdown",
+        "raw_vs_transform_reconciliation"
+      ],
+      "narrative": "Two new e-commerce product IDs for canine flea/tick were absent from the vendor->manufacturer crosswalk, so their April-May 2025 sales existed in raw/stage but were dropped at transform. The 'drop' is a pipeline mapping gap, not a real demand loss -- only visible by reconciling raw/stage against transform along lineage."
+    },
+    {
+      "id": "C3_sku_discontinue_cattle_rx_vaccine",
+      "is_decoy": false,
+      "mechanism": "sku_discontinuation",
+      "scope": {
+        "species": "cattle",
+        "family": "vaccine",
+        "modality": "Rx"
+      },
+      "window": [
+        "2025-07",
+        "2025-12"
+      ],
+      "direction": "down",
+      "metric": "units",
+      "magnitude_pct": -55,
+      "driver_detail": {
+        "note": "one of two cattle Rx vaccine SKUs discontinued"
+      },
+      "layer_visible": "transform",
+      "detectable_by": [
+        "sku_breakdown",
+        "product_family_breakdown"
+      ],
+      "narrative": "One of the two cattle Rx vaccine SKUs was discontinued from 2025Q3; family-level sales fell ~55% concentrated in the discontinued SKU, while the surviving SKU was stable. Visible by drilling to SKU grain."
+    },
+    {
+      "id": "C4_distribution_loss_retail_feline_SE",
+      "is_decoy": false,
+      "mechanism": "distribution_loss",
+      "scope": {
+        "species": "feline",
+        "channel": "retail",
+        "region": "SE"
+      },
+      "window": [
+        "2025-09",
+        "2025-11"
+      ],
+      "direction": "down",
+      "metric": "units",
+      "magnitude_pct": -40,
+      "driver_detail": {
+        "note": "retail partner de-listed feline derm in SE region"
+      },
+      "layer_visible": "transform",
+      "detectable_by": [
+        "channel_breakdown",
+        "region_breakdown"
+      ],
+      "narrative": "The retail channel de-listed feline derm_otc in the SE region for 2025Q3-Q4, a ~40% channel-region loss; other channels and regions for feline were unaffected. Visible by channel x region."
+    },
+    {
+      "id": "C5_returns_spike_ecom_swine_vaccine",
+      "is_decoy": false,
+      "mechanism": "returns_spike",
+      "scope": {
+        "species": "swine",
+        "family": "vaccine",
+        "channel": "ecom_national"
+      },
+      "window": [
+        "2025-05",
+        "2025-06"
+      ],
+      "direction": "down",
+      "metric": "net_units",
+      "magnitude_pct": -22,
+      "driver_detail": {
+        "note": "cold-chain complaint drove a returns spike; gross sales stable but net (sales - returns) fell"
+      },
+      "layer_visible": "transform",
+      "detectable_by": [
+        "returns_decomposition",
+        "gross_vs_net"
+      ],
+      "narrative": "A cold-chain quality complaint caused a returns spike on swine vaccine via e-commerce in May-Jun 2025. Gross sales were flat, but net units (sales minus returns) fell ~22%. Visible only by decomposing gross vs net using the returns fact."
+    },
+    {
+      "id": "C6_stockout_ecom_canine_heartworm",
+      "is_decoy": false,
+      "mechanism": "stockout_fillrate",
+      "scope": {
+        "species": "canine",
+        "family": "heartworm_rx",
+        "channel": "ecom_national"
+      },
+      "window": [
+        "2025-08",
+        "2025-09"
+      ],
+      "direction": "down",
+      "metric": "units",
+      "magnitude_pct": -33,
+      "driver_detail": {
+        "fill_rate_drop_to": 0.55
+      },
+      "layer_visible": "transform",
+      "detectable_by": [
+        "fillrate_decomposition",
+        "inventory_join"
+      ],
+      "narrative": "A supply constraint dropped e-commerce fill rate on canine heartworm Rx to ~55% in Aug-Sep 2025, causing a ~33% unit shortfall. The demand signal (forecast/POA) was intact; the gap is supply-side, visible by joining the fill-rate fact."
+    },
+    {
+      "id": "D1_seasonality_equine_parasiticide_winter",
+      "is_decoy": true,
+      "mechanism": "seasonality",
+      "scope": {
+        "species": "equine"
+      },
+      "window": [
+        "2024-11",
+        "2025-01"
+      ],
+      "direction": "down",
+      "metric": "units",
+      "magnitude_pct": -20,
+      "driver_detail": {
+        "note": "expected winter seasonal dip, recurs YoY"
+      },
+      "layer_visible": "transform",
+      "detectable_by": [
+        "yoy_comparison",
+        "seasonality_check"
+      ],
+      "narrative": "The winter dip in equine parasiticide/dewormer is seasonal and recurs year over year; it is NOT a problem. A correct diagnosis identifies it as seasonality via YoY comparison, not a root-cause event."
+    },
+    {
+      "id": "D2_skumix_canine_derm_variants",
+      "is_decoy": true,
+      "mechanism": "sku_mix_shift_benign",
+      "scope": {
+        "species": "canine",
+        "family": "derm_otc"
+      },
+      "window": [
+        "2025-02",
+        "2025-04"
+      ],
+      "direction": "flat",
+      "metric": "units",
+      "magnitude_pct": 0,
+      "driver_detail": {
+        "note": "within canine derm_otc, variant 1 declines and variant 2 rises by an offsetting amount; family total flat. Looks like a drop only if you view a single SKU."
+      },
+      "layer_visible": "transform",
+      "detectable_by": [
+        "sku_breakdown"
+      ],
+      "narrative": "Within canine derm_otc, one SKU (variant 1) fell while its sibling SKU (variant 2) rose by an offsetting amount; the family total was flat. A single-SKU view sees a 'drop' that is actually a benign within-family SKU mix shift. Correct diagnosis: no net decline."
+    }
+  ]
+}

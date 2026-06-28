@@ -1,0 +1,51 @@
+{
+  "_comment": "Machine-readable lineage for the warehouse. The lineage-aware prompt arm receives a rendered form of this so it can reason about where a DP-layer metric movement actually originates (which upstream table/transform to drill into). The naive arm receives only the dp.* views; the schema-aware arm receives xform.* + dp.* but NOT this lineage graph.",
+  "layers": ["raw", "stage", "xform", "dp"],
+  "grain_notes": {
+    "raw.ecom_sales": "monthly snapshot; product id is PARTNER id (CHEWY_PRODUCT_PART_NUMBER), not manufacturer sku",
+    "raw.retail_sales": "monthly POS; product id is manufacturer vendor_part_no (= sku_id)",
+    "raw.vetclinic_sales": "TRANSACTIONAL invoice-line grain (day-level, many lines per product/region/month)",
+    "raw.ecom_fillrate": "monthly fill-rate/inventory snapshot; ecom partner only",
+    "raw.returns": "multi-channel; product_ref is partner id for ecom, sku_id otherwise"
+  },
+  "nodes": {
+    "raw.ecom_sales":        {"layer": "raw",   "product_key": "partner_pid"},
+    "raw.ecom_fillrate":     {"layer": "raw",   "product_key": "partner_pid"},
+    "raw.retail_sales":      {"layer": "raw",   "product_key": "sku_id"},
+    "raw.vetclinic_sales":   {"layer": "raw",   "product_key": "sku_id", "grain": "invoice_line"},
+    "raw.returns":           {"layer": "raw",   "product_key": "mixed"},
+    "raw.master_sku":        {"layer": "raw",   "role": "dimension_source"},
+    "raw.master_crosswalk":  {"layer": "raw",   "role": "ecom_pid_to_sku_map"},
+
+    "stage.ecom_sales":      {"layer": "stage", "from": ["raw.ecom_sales"], "transform": "rename_to_common_vocab; product_key stays PARTNER id (mapping deferred)"},
+    "stage.ecom_fillrate":   {"layer": "stage", "from": ["raw.ecom_fillrate"], "transform": "rename_to_common_vocab"},
+    "stage.retail_sales":    {"layer": "stage", "from": ["raw.retail_sales"], "transform": "rename_to_common_vocab"},
+    "stage.vetclinic_sales": {"layer": "stage", "from": ["raw.vetclinic_sales"], "transform": "AGGREGATE invoice lines -> monthly grain; volume-weighted price"},
+    "stage.returns":         {"layer": "stage", "from": ["raw.returns"], "transform": "rename_to_common_vocab; product_key still mixed"},
+
+    "xform.dim_product":     {"layer": "xform", "from": ["raw.master_sku"]},
+    "xform.dim_channel":     {"layer": "xform", "from": ["literal"]},
+    "xform.dim_region":      {"layer": "xform", "from": ["literal"]},
+    "xform.dim_date":        {"layer": "xform", "from": ["stage.*_sales"]},
+    "xform.fct_sales":       {"layer": "xform", "from": ["stage.ecom_sales", "stage.retail_sales", "stage.vetclinic_sales", "raw.master_crosswalk"], "transform": "ecom mapped to sku via crosswalk (INNER JOIN); retail/vet already sku; UNION ALL; SUM to sku x month x region x channel", "lineage_risk": "ecom rows whose partner_pid is absent from master_crosswalk are DROPPED here (inner join). They exist in raw/stage but vanish at transform."},
+    "xform.fct_returns":     {"layer": "xform", "from": ["stage.returns", "raw.master_crosswalk"], "transform": "ecom returns mapped via crosswalk; others already sku; SUM to sku x month x region x channel"},
+    "xform.fct_inventory_fillrate": {"layer": "xform", "from": ["stage.ecom_fillrate", "raw.master_crosswalk"], "transform": "mapped via crosswalk; AVG fill_rate, SUM on_hand/forecast"},
+
+    "dp.sales_by_species_channel_month":         {"layer": "dp", "from": ["xform.fct_sales", "xform.dim_product", "xform.dim_date"], "transform": "SUM units/revenue by species x channel x month"},
+    "dp.otc_rx_performance":                     {"layer": "dp", "from": ["xform.fct_sales", "xform.dim_product", "xform.dim_date"], "transform": "SUM by species x modality x region x quarter; blended_price = revenue/units (LOSSY: hides per-sku price moves)"},
+    "dp.net_sales_by_species_channel_quarter":   {"layer": "dp", "from": ["xform.fct_sales", "xform.fct_returns", "xform.dim_product", "xform.dim_date"], "transform": "gross minus returns -> net; COLLAPSES gross-vs-net split needed to see a returns spike"},
+    "dp.region_performance":                     {"layer": "dp", "from": ["xform.fct_sales", "xform.dim_product", "xform.dim_region", "xform.dim_date"], "transform": "SUM by species x region x quarter"}
+  },
+  "drill_hints": {
+    "_comment": "Generic diagnostic drill paths a lineage-aware analyst would know. These are NOT cause-specific answers; they are reusable navigation knowledge that the lineage-aware arm is given and the naive arm is not.",
+    "apparent_drop_in_dp_metric": [
+      "split revenue into price x volume at xform.fct_sales (a price move hides in DP blended_price)",
+      "break down by sku at xform.dim_product (a single discontinued/added sku hides in family/species rollups)",
+      "break down by channel and region at xform.fct_sales (channel- or region-specific losses average out at species level)",
+      "join xform.fct_returns to separate gross vs net (a returns spike leaves gross flat but net down)",
+      "join xform.fct_inventory_fillrate (a supply/stockout gap suppresses units even when demand/forecast is intact)",
+      "RECONCILE stage vs xform row totals (if transform < stage for a scope, suspect a crosswalk/mapping gap dropping rows)",
+      "compare year-over-year for the same month (a recurring seasonal dip is NOT a root-cause event)"
+    ]
+  }
+}
