@@ -2,7 +2,7 @@
 execute_sql.py
 ==============
 Loads the synthetic warehouse into an in-process DuckDB database and executes
-agent-generated SQL with guardrails. Used by the lineage_exec arm's tool loop
+agent-generated SQL with guardrails. Used by all arms' execute_sql tool loop
 and by score.py for ground-truth checks.
 
 Guardrails:

@@ -149,16 +149,57 @@ def score_answer(question, parsed_answer):
 
 
 def parse_json_block(text):
-    """Extract the final ```json {...} ``` block from a model response."""
+    """Extract the verdict JSON from a model response. Robust to:
+       - fenced ```json ... ``` blocks (closed or unclosed)
+       - JSON appearing first or last in the message
+       - a trailing prose after the block
+    Strategy: find the first '{' that starts a brace-balanced object containing
+    'root_cause_mechanism' and parse it; fall back to any balanced object."""
     import re
-    blocks = re.findall(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if not blocks:
-        # fallback: last {...} that parses
-        cands = re.findall(r"(\{.*\})", text, re.DOTALL)
-        blocks = cands[-1:] if cands else []
-    for b in reversed(blocks):
+    if not text:
+        return {}
+
+    # 1) try fenced json blocks first (closed)
+    for m in re.findall(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL):
         try:
-            return json.loads(b)
+            obj = json.loads(m)
+            if "root_cause_mechanism" in obj:
+                return obj
+        except Exception:
+            pass
+
+    # 2) brace-balanced scan: find every top-level {...} and try to parse
+    candidates = []
+    depth = 0
+    start = None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    candidates.append(text[start:i + 1])
+                    start = None
+    # prefer a candidate that contains the verdict key
+    ranked = sorted(candidates,
+                    key=lambda c: ("root_cause_mechanism" in c, len(c)),
+                    reverse=True)
+    for c in ranked:
+        try:
+            obj = json.loads(c)
+            if isinstance(obj, dict) and "root_cause_mechanism" in obj:
+                return obj
+        except Exception:
+            continue
+    # 3) last resort: any parseable object
+    for c in ranked:
+        try:
+            obj = json.loads(c)
+            if isinstance(obj, dict):
+                return obj
         except Exception:
             continue
     return {}

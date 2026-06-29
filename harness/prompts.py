@@ -7,12 +7,11 @@ model is given. Everything else (task instructions, output contract, tool loop)
 is held constant.
 
 ARMS
-  naive          : sees only the DP-layer views (dp.*). No transform, no lineage.
-  schema_aware   : sees the full transform star schema (xform.*) + DP views.
-  lineage_aware  : schema_aware + the machine-readable lineage graph + drill hints.
-  lineage_exec   : same context as lineage_aware; the DIFFERENCE is the runner
-                   gives it an execution-feedback loop (multi-turn: run queries,
-                   see results, revise) instead of single-shot.
+  ALL arms can execute SQL (constant capability). They differ on two axes:
+    context depth:  naive (DP views only) < schema_aware (+transform star)
+                    < lineage_aware / lineage_iterative (+lineage graph + hints)
+    iteration:      naive/schema_aware/lineage_aware get ONE query round
+                    (single-pass); lineage_iterative may drill across rounds.
 
 CACHING (see README): the static context below is the cacheable PREFIX. The
 caller marks the LAST static block with cache_control. The per-question text is
@@ -41,6 +40,13 @@ dp.region_performance(species, region, region_name, quarter, units, revenue)
 Dimensions of note: species in {equine,cattle,canine,feline,swine,poultry};
 modality in {Rx,OTC}; channel in {ecom_national,retail,vet_clinic};
 region in {NE,MA,SE,MW,TX,MTN,PSW,PNW}; months 'YYYY-MM' spanning 2024-01..2025-12.
+
+LITERAL VALUE FORMATS (use these EXACTLY in WHERE clauses):
+ - month:   'YYYY-MM'   e.g. '2025-01'  (NOT 'Jan 2025')
+ - quarter: 'YYYYQ#'    e.g. '2025Q1'   (year first, no space; NOT 'Q1 2025')
+ - To get a quarter's months, filter month BETWEEN '2025-01' AND '2025-03'.
+ - If a query returns 0 rows, your filter values are probably mis-formatted --
+   re-check the literal formats above and try again before concluding anything.
 """
 
 TRANSFORM_SCHEMA = """\
@@ -64,7 +70,7 @@ Notes:
  - No foreign-key constraints are enforced (warehouse semantics).
 """
 
-# Rendered lineage graph (only the lineage_aware / lineage_exec arms see this)
+# Rendered lineage graph (only the lineage_aware / lineage_iterative arms see this)
 def _render_lineage():
     with open(os.path.join(WH, "lineage.json")) as f:
         lin = json.load(f)
@@ -113,45 +119,58 @@ TASK_INSTRUCTIONS = """\
 You are a diagnostic analytics agent for an animal-health manufacturer's
 commercial-excellence team. A business user asks a DIAGNOSTIC ("why") question
 about sales movements. Your job is NOT just to fetch a number -- it is to find
-and explain the ROOT CAUSE, grounded entirely in the data.
+and explain the ROOT CAUSE, grounded in the data.
+
+You have an execute_sql tool. Use it to run read-only SELECT queries and observe
+the actual results. Then COMMIT to a final verdict.
 
 How to work:
  1. Decompose the question into the specific SQL queries needed to localize the
     cause (by region, channel, sku, price-vs-volume, gross-vs-net, fill-rate,
     or by reconciling upstream vs downstream tables along the data pipeline).
- 2. Ground every claim in query results. Do NOT invent numbers.
- 3. Distinguish a REAL problem from a BENIGN movement (seasonality that recurs
+ 2. Run those queries with the execute_sql tool and read the returned rows.
+ 3. Ground every claim in the query results you actually saw. Do NOT invent numbers.
+ 4. Distinguish a REAL problem from a BENIGN movement (seasonality that recurs
     year-over-year; a within-family SKU mix shift that nets flat; a pipeline/data
     issue that is not a true demand loss). Do not over-attribute: if there is no
     real problem, say so.
- 4. If the movement is a DATA/PIPELINE artifact rather than a demand change, say
-    that explicitly.
 
-OUTPUT CONTRACT -- end your final answer with a single fenced ```json block:
+CRITICAL OUTPUT RULES:
+ - You MUST end with a final committed verdict. Do NOT ask the user to run
+   queries for you -- you have the execute_sql tool, use it yourself.
+ - After you have run the queries you need, your FINAL message MUST contain the
+   json verdict block below and nothing may follow it.
+ - Emit the json block as the FIRST thing in your final message, before any prose,
+   so it is never cut off. Keep the explanation to 2-3 sentences.
+
+VERDICT FORMAT -- your final message must begin with exactly this fenced block:
 ```json
 {
   "root_cause_mechanism": "<one of: price_increase | sku_discontinuation | distribution_loss | returns_spike | stockout_fillrate | lineage_crosswalk_gap | seasonality | sku_mix_shift_benign | none | other>",
-  "scope": {"species": "...", "modality": "...", "family": "...", "channel": "...", "region": "..."},
   "is_real_problem": true,
+  "scope": {"species": "...", "modality": "...", "family": "...", "channel": "...", "region": "..."},
   "explanation": "<2-3 sentence grounded explanation with the key numbers>",
   "evidence_queries": ["<the SQL you relied on>"]
 }
 ```
-Use only keys that apply in "scope". Set "is_real_problem" false for benign/seasonal/
-data-artifact cases. "root_cause_mechanism":"none" means no real problem found.
+Use only the keys that apply inside "scope". Set "is_real_problem" false for
+benign/seasonal/data-artifact cases. "root_cause_mechanism":"none" means no real
+problem was found.
 """
 
-SINGLE_SHOT_NOTE = """\
-You may reason step by step, but you will produce SQL and your final answer in a
-single response. Assume the queries you write will be executed and you should
-state the expected diagnostic logic and the answer based on the schema given.
+SINGLE_PASS_NOTE = """\
+WORKFLOW: Decompose the question into the queries you need and run them. If a
+query errors or returns 0 rows, FIX it (check the literal value formats) and
+re-run -- you have a few turns to get your queries working. Once you have real
+results from your decomposition, COMMIT to your verdict. Do not start a fresh
+second decomposition after seeing results; analyze what your initial plan returned.
 """
 
-EXEC_LOOP_NOTE = """\
-You have an execute_sql tool. Call it to run SQL against the warehouse, observe
-the returned rows, and iterate: drill down, reconcile upstream vs downstream,
-and revise your hypothesis based on what you see. When confident, give the final
-answer with the required json block.
+ITERATIVE_NOTE = """\
+WORKFLOW: Decompose and run queries. If a query errors or returns 0 rows, fix it
+and re-run. You may also query ITERATIVELY across multiple rounds -- inspect
+results, drill deeper, reconcile upstream vs downstream, and revise your
+hypothesis as many times as needed. When confident, COMMIT to your verdict.
 """
 
 
@@ -160,29 +179,32 @@ answer with the required json block.
 # ---------------------------------------------------------------------------
 def build_system_prefix(arm):
     """Return a list of system content blocks (the cacheable PREFIX).
-    The caller marks the LAST block with cache_control."""
+    The caller marks the LAST block with cache_control.
+
+    All four arms EXECUTE SQL (constant capability). They differ on two axes:
+      context depth:  naive(DP) < schema_aware(+transform) < lineage_*(+lineage)
+      iteration:      single-pass (naive/schema/lineage_aware) vs iterative (lineage_iterative)
+    """
     if arm == "naive":
         ctx = DP_SCHEMA
-        loop_note = SINGLE_SHOT_NOTE
+        loop_note = SINGLE_PASS_NOTE
     elif arm == "schema_aware":
         ctx = DP_SCHEMA + "\n" + TRANSFORM_SCHEMA
-        loop_note = SINGLE_SHOT_NOTE
+        loop_note = SINGLE_PASS_NOTE
     elif arm == "lineage_aware":
         ctx = DP_SCHEMA + "\n" + TRANSFORM_SCHEMA + "\n" + LINEAGE_BLOCK
-        loop_note = SINGLE_SHOT_NOTE
-    elif arm == "lineage_exec":
+        loop_note = SINGLE_PASS_NOTE
+    elif arm == "lineage_iterative":
         ctx = DP_SCHEMA + "\n" + TRANSFORM_SCHEMA + "\n" + LINEAGE_BLOCK
-        loop_note = EXEC_LOOP_NOTE
+        loop_note = ITERATIVE_NOTE
     else:
         raise ValueError(f"unknown arm: {arm}")
 
     full = TASK_INSTRUCTIONS + "\n" + loop_note + "\n\nWAREHOUSE CONTEXT\n" + ctx
-    # Single cacheable block (the whole static prefix). The caller adds
-    # cache_control to this block.
     return [{"type": "text", "text": full}]
 
 
-ARMS = ["naive", "schema_aware", "lineage_aware", "lineage_exec"]
+ARMS = ["naive", "schema_aware", "lineage_aware", "lineage_iterative"]
 
 if __name__ == "__main__":
     for a in ARMS:

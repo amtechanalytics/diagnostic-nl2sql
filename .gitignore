@@ -2,3 +2,16 @@
 .env.*
 *.key
 .venv/
+results/*.jsonl
+results/*.csv
+results/*.txt
+results/run_summary.json
+!results/.gitkeep
+.DS_Store
+__pycache__/
+!results/responses.jsonl
+!results/scored.jsonl
+!results/accuracy_by_arm.csv
+!results/pairwise_mcnemar.csv
+!results/breakdown_by_type.csv
+!results/summary.txt

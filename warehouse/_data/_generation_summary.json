@@ -4,8 +4,8 @@
     "raw_ecom_sales.csv": 6096,
     "raw_ecom_fillrate.csv": 6096,
     "raw_retail_sales.csv": 6096,
-    "raw_vetclinic_sales.csv": 17491,
-    "raw_returns.csv": 10699
+    "raw_vetclinic_sales.csv": 17479,
+    "raw_returns.csv": 10718
   },
   "n_skus": 32,
   "n_causes": 8

@@ -1,0 +1,13 @@
+model,arm_a,arm_b,acc_a,acc_b,a_only,b_only,mcnemar_p,favored
+haiku,naive,schema_aware,0.464,0.446,10,9,1.0,A
+haiku,naive,lineage_aware,0.464,0.429,10,8,0.8145,A
+haiku,naive,lineage_iterative,0.464,0.696,6,19,0.0146,B
+haiku,schema_aware,lineage_aware,0.446,0.429,6,5,1.0,A
+haiku,schema_aware,lineage_iterative,0.446,0.696,5,19,0.0066,B
+haiku,lineage_aware,lineage_iterative,0.429,0.696,4,19,0.0026,B
+sonnet,naive,schema_aware,0.464,0.625,5,14,0.0636,B
+sonnet,naive,lineage_aware,0.464,0.607,6,14,0.1153,B
+sonnet,naive,lineage_iterative,0.464,0.857,2,24,0.0,B
+sonnet,schema_aware,lineage_aware,0.625,0.607,8,7,1.0,A
+sonnet,schema_aware,lineage_iterative,0.625,0.857,1,14,0.001,B
+sonnet,lineage_aware,lineage_iterative,0.607,0.857,0,14,0.0001,B

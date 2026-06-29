@@ -1,0 +1,9 @@
+model,arm,n,cause_identified,rate,wilson_lo,wilson_hi
+haiku,naive,56,26,0.464,0.34,0.593
+haiku,schema_aware,56,25,0.446,0.324,0.576
+haiku,lineage_aware,56,24,0.429,0.308,0.559
+haiku,lineage_iterative,56,39,0.696,0.567,0.801
+sonnet,naive,56,26,0.464,0.34,0.593
+sonnet,schema_aware,56,35,0.625,0.494,0.74
+sonnet,lineage_aware,56,34,0.607,0.476,0.724
+sonnet,lineage_iterative,56,48,0.857,0.743,0.926

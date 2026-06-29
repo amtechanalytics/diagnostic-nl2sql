@@ -61,20 +61,41 @@ pip install -r requirements.txt
 # 3. set your key
 export ANTHROPIC_API_KEY=sk-...
 
-# 4. run the experiment (makes the API calls; SEQUENTIAL by design)
-python harness/run_experiment.py        # writes results/responses.jsonl
+# 4. run the experiment THROUGH THE MONITOR (recommended)
+python harness/run_with_monitor.py        # writes results/responses.jsonl
 
 # 5. score + stats (no API calls; re-runnable)
-python harness/analyze.py               # writes results/*.csv + summary.txt
+python harness/analyze.py                 # writes results/*.csv + summary.txt
 ```
 
-Load the DDL into DuckDB manually if you want to explore:
-```bash
-cd warehouse
-duckdb mywarehouse.duckdb \
-  ".read 01_raw_ddl.sql" ".read 02_stage_ddl.sql" \
-  ".read 03_transform_ddl.sql" ".read 04_dp_views.sql"
-```
+### Live validation gates (built into the runner)
+
+The runner self-protects so a broken output format or runaway cost can't burn a
+full budget:
+
+1. **Strict canary (3/3).** Before the full matrix, it runs `CANARY_N` (default
+   3) questions on one arm and parses each immediately. If **any** fail to yield
+   a valid verdict block, it **aborts before the full run** (exit 2) for ~$0.10.
+   This is the cheap insurance.
+2. **Live parse monitoring.** Every response is parsed as it lands. While the
+   format is still being proven it prints a per-response `parse_ok` flag and the
+   rolling parse-rate. After 30 consecutive clean parses it switches to **quiet
+   cost-only mode**.
+3. **Parse-floor abort (exit 3).** If the rolling parse-rate (last 20) drops
+   below `PARSE_FLOOR` (default 0.85), the run aborts to save budget.
+4. **Cost-ceiling abort (exit 4).** If running cost exceeds `COST_CEILING`
+   (default $25), the run aborts.
+
+`results/status.txt` is rewritten every response with a compact line
+(`model/arm done/total | cost | roll_parse | WATCH|QUIET | last qid`). Tail it
+in another terminal: `tail -f results/status.txt`.
+
+The monitor wrapper (`run_with_monitor.py`) streams the runner output and
+surfaces the status heartbeat; it reports a plain-English meaning for the exit
+code. You can also run `python harness/run_experiment.py` directly (same gates),
+but the monitor is the intended entry point.
+
+Env knobs: `CANARY_N`, `CANARY_ARM`, `PARSE_FLOOR`, `COST_CEILING`.
 
 ## Cost
 

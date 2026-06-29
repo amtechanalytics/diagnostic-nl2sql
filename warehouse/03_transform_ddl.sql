@@ -46,7 +46,7 @@ SELECT DISTINCT
     CAST(substr(month,1,4) AS INTEGER)                              AS year,
     CAST(substr(month,6,2) AS INTEGER)                              AS month_num,
     substr(month,1,4) || 'Q' ||
-        CAST(((CAST(substr(month,6,2) AS INTEGER)-1)/3)+1 AS VARCHAR) AS quarter
+        CAST((CAST(substr(month,6,2) AS INTEGER)-1) // 3 + 1 AS VARCHAR) AS quarter
 FROM (
     SELECT month FROM stage.retail_sales
     UNION SELECT month FROM stage.ecom_sales

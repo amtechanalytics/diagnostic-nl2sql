@@ -1,0 +1,14 @@
+DIAGNOSTIC NL2SQL -- RESULTS SUMMARY
+========================================
+
+Model: haiku
+  naive          26/56 = 46.4%  (95% CI 0.34-0.59)
+  schema_aware   25/56 = 44.6%  (95% CI 0.32-0.58)
+  lineage_aware  24/56 = 42.9%  (95% CI 0.31-0.56)
+  lineage_iterative 39/56 = 69.6%  (95% CI 0.57-0.80)
+
+Model: sonnet
+  naive          26/56 = 46.4%  (95% CI 0.34-0.59)
+  schema_aware   35/56 = 62.5%  (95% CI 0.49-0.74)
+  lineage_aware  34/56 = 60.7%  (95% CI 0.48-0.72)
+  lineage_iterative 48/56 = 85.7%  (95% CI 0.74-0.93)

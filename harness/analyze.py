@@ -26,7 +26,7 @@ sys.path.insert(0, HERE)
 import score as scoring  # noqa: E402
 import stats as st  # noqa: E402
 
-ARMS = ["naive", "schema_aware", "lineage_aware", "lineage_exec"]
+ARMS = ["naive", "schema_aware", "lineage_aware", "lineage_iterative"]
 
 
 def load():
