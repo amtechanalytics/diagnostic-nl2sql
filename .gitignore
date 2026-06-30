@@ -9,6 +9,7 @@ results/run_summary.json
 !results/.gitkeep
 .DS_Store
 __pycache__/
+docs/
 !results/responses.jsonl
 !results/scored.jsonl
 !results/accuracy_by_arm.csv
