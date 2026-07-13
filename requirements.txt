@@ -1,2 +1,4 @@
 anthropic>=0.40.0
 duckdb>=1.0.0
+matplotlib==3.9.2
+numpy
