@@ -16,3 +16,4 @@ docs/
 !results/pairwise_mcnemar.csv
 !results/breakdown_by_type.csv
 !results/summary.txt
+figures/

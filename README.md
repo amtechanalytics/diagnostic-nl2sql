@@ -141,3 +141,19 @@ DDL is written for **DuckDB**. A Snowflake-dialect version can be emitted from
 the same logic if needed (the constraint-free, crosswalk-resolved star schema is
 identical; only `strftime`/`VALUES` syntax differs). The offline validation in
 development used SQLite as a proxy; run on DuckDB for the real experiment.
+
+## Figures
+
+`make_figures.py` generates the figure for the cost–accuracy analysis of the
+diagnostic NL2SQL results.
+
+    python3 make_figures.py
+
+Reads `results/scored.jsonl` and writes `figures/fig1_frontier.png` — the
+investment frontier: diagnostic accuracy against measured inference spend, for
+both model tiers across all four arms, with 95% Wilson intervals.
+
+All numbers are read directly from the scored results file and recomputed at run
+time; none are hand-entered. The script echoes every accuracy and cost cell to
+stdout on each run, so any drift between the result file and a published figure
+is caught immediately.
